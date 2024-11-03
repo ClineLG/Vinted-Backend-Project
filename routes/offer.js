@@ -329,7 +329,7 @@ router.get("/offers", async (req, res) => {
       .sort(sorted)
       .skip(valeur)
       .limit(limit)
-      .select("-product pictures");
+      .select("-product_pictures");
 
     const counter = (await Offer.find(filter)).length;
 
