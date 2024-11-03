@@ -21,32 +21,34 @@ router.post(
 
   async (req, res) => {
     try {
-      if (
-        !req.body.title ||
-        !req.body.price ||
-        req.body.title === "" ||
-        req.body.price === ""
-      ) {
+      const {
+        title,
+        description,
+        price,
+        condition,
+        city,
+        brand,
+        size,
+        color,
+        user,
+      } = req.body;
+      if (!title || !price || title === "" || price === "" || !description) {
         return res.status(404).json({ error: "Missing parameters" });
       }
 
-      if (req.body.description.length > 500) {
+      if (description.length > 500) {
         return res
           .status(400)
           .json({ error: "Need a description less than 500 characters" });
       }
-      if (req.body.title.length > 50) {
+      if (title.length > 50) {
         return res
           .status(400)
           .json({ error: "Need a title less than 50 characters" });
       }
-      if (req.body.price > 100000) {
+      if (price > 100000) {
         return res.status(400).json({ error: "Need a price less than 100000" });
       }
-
-      const { title, description, price, condition, city, brand, size, color } =
-        req.body;
-
       const newOffer = new Offer({
         product_name: title,
         product_description: description,
@@ -58,57 +60,35 @@ router.post(
           { COULEUR: color },
           { EMPLACEMENT: city },
         ],
-        owner: req.body.user,
+        owner: user,
       });
       if (req.files) {
-        // console.log(newOffer._id);
         if (req.files.picture) {
           const convertedPicture = convertToBase64(req.files.picture);
           newOffer.product_image = await cloudinary.uploader.upload(
             convertedPicture,
             {
-              folder: `Vinted/user/${newOffer.id}`,
+              folder: `Vinted/offers/${newOffer.id}`,
             }
           );
         }
         if (req.files.pictures) {
           const ArrayOfPix = req.files.pictures;
-          console.log("coucou");
-          for (let i = 0; i < ArrayOfPix.length; i++) {
-            const picture = ArrayOfPix[i];
-            newOffer.product_pictures.push(
-              await cloudinary.uploader.upload(convertToBase64(picture), {
-                folder: `Vinted/offers/${newOffer._id}`,
-              })
-            );
-          }
+
+          const arrPromises = ArrayOfPix.map((picture) => {
+            return cloudinary.uploader.upload(convertToBase64(picture), {
+              folder: `Vinted/offers/${newOffer._id}`,
+            });
+          });
+          newOffer.product_pictures = await Promise.all(arrPromises);
         }
       }
-
       await newOffer.save();
-      //à changer:
-      const {
-        _id,
-        product_name,
-        product_description,
-        product_price,
-        product_details,
-        owner,
-        product_image,
-      } = newOffer;
+      offertosend = await Offer.findById(newOffer._id)
+        .populate("owner", "account")
+        .select("-product_pictures");
 
-      const ObjToSend = {
-        _id: _id,
-        product_name: product_name,
-        product_description: product_description,
-        product_price: product_price,
-        product_details: product_details,
-        owner: owner,
-        product_image: product_image,
-      };
-
-      console.log(ObjToSend);
-      res.status(201).json(ObjToSend);
+      res.status(201).json(offertosend);
     } catch (error) {
       console.log(error.message);
       res.status(500).json({ error: error.message });
@@ -122,6 +102,9 @@ router.put(
   fileUpload(),
   async (req, res) => {
     try {
+      const { title, description, price, brand, size, condition, color, city } =
+        req.body;
+
       if (!req.params.id || !isObjectIdOrHexString(req.params.id)) {
         return res.status(400).json({ error: "Missing parameters" });
       }
@@ -131,44 +114,35 @@ router.put(
       if (!offerToUpdat) {
         return res.status(404).json({ error: "No offer found" });
       }
-      //destructuring à faire:
       if (req.body.user._id.toString() !== offerToUpdat.owner.toString()) {
         return res
           .status(404)
           .json({ error: "Not allowed to update this offer" });
       }
-      if (req.body.title) {
+      if (title) {
         offerToUpdat.product_name = req.body.title;
       }
-      if (req.body.description) {
+      if (description) {
         offerToUpdat.product_description = req.body.description;
       }
-      if (req.body.price) {
+      if (price) {
         offerToUpdat.product_price = req.body.price;
       }
-      if (req.body.brand) {
+      if (brand) {
         offerToUpdat.product_details[0].MARQUE = req.body.brand;
       }
-      if (req.body.size) {
+      if (size) {
         offerToUpdat.product_details[1].TAILLE = req.body.size;
       }
-      if (req.body.condition) {
+      if (condition) {
         offerToUpdat.product_details[3].ETAT = req.body.condition;
       }
-      if (req.body.color) {
+      if (color) {
         offerToUpdat.product_details[4].COULEUR = req.body.color;
       }
-      if (req.body.city) {
+      if (city) {
         offerToUpdat.product_details[5].EMPLACEMENT = req.body.city;
       }
-      // if (req.body.picturesToDelete) {
-      //   console.log(req.body.picturesToDelete);
-      //   let tabTest = req.body.picturesToDelete.split("-");
-      //   console.log(tabTest);
-
-      // !\\ pouvoir delete pictures
-
-      // }
 
       if (req.files) {
         if (req.files.picture) {
@@ -182,22 +156,18 @@ router.put(
         }
         if (req.files.pictures) {
           const ArrayOfPix = req.files.pictures;
-          //à changer avec promise all
-          for (let i = 0; i < ArrayOfPix.length; i++) {
-            const picture = ArrayOfPix[i];
-            offerToUpdat.product_pictures.push(
-              await cloudinary.uploader.upload(convertToBase64(picture), {
-                folder: `Vinted/offers/${offerToUpdat._id}`,
-              })
-            );
-          }
+          const arrPromises = ArrayOfPix.map((picture) => {
+            return cloudinary.uploader.upload(convertToBase64(picture), {
+              folder: `Vinted/offers/${offerToUpdat._id}`,
+            });
+          });
+          offerToUpdat.product_pictures += await Promise.all(arrPromises);
         }
       }
       await offerToUpdat.save();
 
       const fullObj = await offerToUpdat.populate("owner", "account");
 
-      //   console.log(ObjToSend);
       res.status(201).json(fullObj);
     } catch (error) {
       console.log(error.message);
@@ -205,6 +175,66 @@ router.put(
     }
   }
 );
+
+router.delete("/offer/delete/picture", isAuthenticated, async (req, res) => {
+  try {
+    if (
+      !req.query.id ||
+      !isObjectIdOrHexString(req.query.id) ||
+      !req.query.secure_url
+    ) {
+      return res.status(400).json({ error: "missing parameters" });
+    }
+
+    const offerToDeletePix = await Offer.findById(req.query.id);
+
+    if (!offerToDeletePix) {
+      return res.status(404).json({ error: "Offer does not exist" });
+    }
+    if (req.body.user._id.toString() !== offerToDeletePix.owner.toString()) {
+      return res
+        .status(404)
+        .json({ error: "Not allowed to delete this offer" });
+    }
+    let answer = false;
+
+    if (offerToDeletePix.product_image.secure_url === req.query.secure_url) {
+      const picturePrincipalToDelete = offerToDeletePix.product_image;
+      await cloudinary.uploader.destroy(picturePrincipalToDelete.public_id);
+      offerToDeletePix.product_image = {};
+      answer = true;
+    }
+    const newArrofpix = [];
+
+    for (let i = 0; i < offerToDeletePix.product_pictures.length; i++) {
+      if (
+        offerToDeletePix.product_pictures[i].secure_url === req.query.secure_url
+      ) {
+        const pictureToDelete = offerToDeletePix.product_pictures[i];
+        await cloudinary.uploader.destroy(pictureToDelete.public_id);
+        answer = true;
+      } else {
+        newArrofpix.push(offerToDeletePix.product_pictures[i]);
+      }
+    }
+
+    if (answer === false) {
+      return res
+        .status(400)
+        .json({ error: "wrong secure_url, no picture to delete" });
+    }
+    offerToDeletePix.product_pictures.slice(
+      0,
+      offerToDeletePix.product_pictures.length
+    );
+    offerToDeletePix.product_pictures = newArrofpix;
+    await offerToDeletePix.save();
+    res.status(201).json({ message: "Picture successfully deleted" });
+  } catch (error) {
+    console.log(error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 router.delete("/offer/delete/:id", isAuthenticated, async (req, res) => {
   try {
@@ -222,22 +252,41 @@ router.delete("/offer/delete/:id", isAuthenticated, async (req, res) => {
         .json({ error: "Not allowed to delete this offer" });
     }
 
-    const picturesToDelete = offerToDelet.product_pictures;
-    console.log(picturesToDelete);
-    //changer avec promis.all
-    for (let i = 0; i < picturesToDelete.length; i++) {
-      await cloudinary.uploader.destroy(picturesToDelete[i].public_id);
-    }
-    const picturePrincipalToDelete = offerToDelet.product_image;
-    const folder = picturePrincipalToDelete.asset_folder;
-    console.log(folder);
+    if (offerToDelet.product_image || offerToDelet.product_pictures) {
+      if (offerToDelet.product_image) {
+        const folder = offerToDelet.product_image.asset_folder;
 
-    //faire delet folder...//!\\
-    // await cloudinary.api.delete_folder(folder);
+        const picturePrincipalToDelete = offerToDelet.product_image;
+        await cloudinary.uploader.destroy(picturePrincipalToDelete.public_id);
+
+        const picturesToDelete = offerToDelet.product_pictures;
+
+        const arrPromises = picturesToDelete.map((picture) => {
+          return cloudinary.uploader.destroy(picture.public_id);
+        });
+
+        await Promise.all(arrPromises);
+
+        await cloudinary.api.delete_folder(folder);
+      } else if (offerToDelet.product_pictures.length > 0) {
+        const folder = offerToDelet.product_pictures[0].asset_folder;
+
+        const picturePrincipalToDelete = offerToDelet.product_image;
+        await cloudinary.uploader.destroy(picturePrincipalToDelete.public_id);
+
+        const picturesToDelete = offerToDelet.product_pictures;
+
+        const arrPromises = picturesToDelete.map((picture) => {
+          return cloudinary.uploader.destroy(picture.public_id);
+        });
+
+        await Promise.all(arrPromises);
+      }
+    }
 
     const offerToDeletRealy = await Offer.findByIdAndDelete(req.params.id);
 
-    res.status(200).json({ message: "Offer successfully deleted" });
+    res.status(200).json({ message: "Offer successfully deleted !" });
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: error });
