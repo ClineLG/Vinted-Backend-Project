@@ -161,7 +161,12 @@ router.put(
               folder: `Vinted/offers/${offerToUpdat._id}`,
             });
           });
-          offerToUpdat.product_pictures += await Promise.all(arrPromises);
+
+          arrNewPixToUptade = await Promise.all(arrPromises);
+
+          for (let j = 0; j < arrNewPixToUptade.length; j++) {
+            offerToUpdat.product_pictures.push(arrNewPixToUptade[j]);
+          }
         }
       }
       await offerToUpdat.save();
