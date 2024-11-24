@@ -300,7 +300,7 @@ router.delete("/offer/delete/:id", isAuthenticated, async (req, res) => {
 
 router.get("/offers", async (req, res) => {
   try {
-    const { title, priceMin, priceMax, sort, page } = req.query;
+    const { title, priceMin, priceMax, sort, page, limit } = req.query;
     let filter = {};
     if (title) {
       filter.product_name = new RegExp(title, "i");
@@ -316,12 +316,13 @@ router.get("/offers", async (req, res) => {
         filter.product_price = { $lte: Number(priceMax) };
       }
     }
-    const limit = 2;
     let valeur = 0;
-
-    if (page) {
-      valeur = (page - 1) * limit;
+    if (limit) {
+      if (page) {
+        valeur = (page - 1) * limit;
+      }
     }
+
     let sorted = {};
     if (sort === "price-desc") {
       sorted.product_price = -1;
