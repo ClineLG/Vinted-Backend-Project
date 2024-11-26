@@ -2,6 +2,7 @@ const express = require("express");
 const isAuthenticated = require("../middleware/isAuthenticated");
 const router = express.Router();
 const cloudinary = require("cloudinary").v2;
+const stripe = require("stripe")(process.env.PRIVATE_KEY);
 
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
@@ -20,6 +21,8 @@ router.post(
   fileUpload(),
 
   async (req, res) => {
+    console.log(req.body);
+    console.log(req.files);
     try {
       const {
         title,
@@ -72,6 +75,7 @@ router.post(
             }
           );
         }
+        console.log(req.files.pictures);
         if (req.files.pictures) {
           const ArrayOfPix = req.files.pictures;
 
@@ -342,6 +346,23 @@ router.get("/offers", async (req, res) => {
     res.status(201).json({ count: counter, offers });
   } catch (error) {
     console.log(error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post("/offer/payment", async (req, res) => {
+  try {
+    const { amount, currency, description } = req.body;
+    console.log(req.body);
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount,
+      currency: currency,
+      description: description,
+      automatic_payment_methods: { enabled: true },
+    });
+    console.log(paymentIntent);
+    res.status(200).json(paymentIntent);
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });

@@ -22,6 +22,8 @@ const fileUpload = require("express-fileupload");
 
 router.post("/signup", fileUpload(), async (req, res) => {
   try {
+    console.log(req.body);
+
     if (!req.body.email || !req.body.password) {
       return res.status(404).json({ error: "Parameters missing" });
     }
